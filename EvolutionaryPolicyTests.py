@@ -3,9 +3,9 @@ from BenchMarker import measure_time_seconds
 from EvolutionaryPolicy import EvolutionaryPolicy
 
 
-class EvoTests:
+class EvolutionaryPolicyTests:
 
-    def __init__(self) -> None:
+    def __init__(self):
         self.env_train = gym.make("CartPole-v1")
         self.env_test = gym.make("CartPole-v1", render_mode="human")
         self.CartPolePolicy = EvolutionaryPolicy(
@@ -13,8 +13,8 @@ class EvoTests:
             n_output=[0, 1],  # Encoded list of possible actions [left, right]
             layers_heights=[4, 4, 4],  # internal neural net layers number of nodes
         )
-        # self.CartPolePolicy.load("../models/evo/model_temp2_1021")
-        self.CartPolePolicy.load("models/evo/model_temp_2022")
+        self.CartPolePolicy.load("models/evo/model_temp2_1021")
+        # self.CartPolePolicy.load("models/evo/model_temp_2022")
 
     def run_policy(self):
         observation, info = self.env_test.reset()
@@ -35,7 +35,7 @@ class EvoTests:
                 self.env_train.step,
                 population=20,
                 n_generations=1_000,
-                model_dir="models/evo/model_temp2"
+                model_dir="models/evo/model444/temp"
             )
         )
         goodness = self.CartPolePolicy.evaluate(self.env_train.reset, self.env_train.step)
@@ -51,3 +51,10 @@ class EvoTests:
             )
         )
         print(f"Final {goodness=}, in {duration} seconds")
+
+
+if __name__ == '__main__':
+    evo_test = EvolutionaryPolicyTests()
+    evo_test.run_policy()
+    # evo_test.train_policy()
+    # evo_test.evaluate_policy()

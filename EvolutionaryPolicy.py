@@ -8,6 +8,8 @@ from copy import copy, deepcopy
 from functools import partial
 
 
+# TODO(Extract the params from here so as different architectures can be built and used separately)
+
 class EvolutionaryPolicy:
     def __init__(self, n_input: int, n_output: int | List[int], n_hidden: int = None, layers_heights: List[int] = None):
         self.params = []
