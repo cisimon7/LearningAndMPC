@@ -55,9 +55,9 @@ class EvolutionaryPolicyTests:
 
 if __name__ == '__main__':
     evo_test = EvolutionaryPolicyTests()
-    # evo_test.run_policy()
+    evo_test.run_policy()
     # evo_test.train_policy()
-    # evo_test.evaluate_policy()
+    evo_test.evaluate_policy()
     # TODO(Something wrong with the possible action output, it seems ours can only output 1)
-    actions = [evo_test.env_test.action_space.sample() for _ in range(10)]
-    print(actions)
+    # actions = [evo_test.env_test.action_space.sample() for _ in range(10)]
+    # print(actions)

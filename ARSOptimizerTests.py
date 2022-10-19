@@ -25,6 +25,7 @@ class ARSOptimizerTests:
             torch.nn.Linear(in_features=4, out_features=2, bias=False),
             torch.nn.Sigmoid()
         )
+        # self.cartpole_model.to("mps")
 
     def opti_rosenbrock(self, x_init, n_steps=2_000):
         self.path = np.empty((n_steps + 1, 2))
@@ -49,7 +50,7 @@ class ARSOptimizerTests:
         xy_t.detach_()
         print(f"Minimum at: {xy_t}")
 
-    def ars_rosenbrock(self, x_init, n_steps=2_000):
+    def ars_rosenbrock(self, x_init, n_steps=1_000):
         self.path = np.empty((n_steps + 1, 2))
         self.path[0, :] = x_init
         xy_t = torch.tensor(x_init)
@@ -62,18 +63,18 @@ class ARSOptimizerTests:
 
         with tqdm(total=n_steps, postfix={"loss": torch.inf}) as tqdm_:
             for t in range(1, n_steps + 1):
-                loss = rosenbrock(xy_t)
                 optimizer.step()
 
                 self.path[t, :] = xy_t.detach().numpy()
                 tqdm_.update()
                 if t % 10 == 0:
-                    tqdm_.set_postfix({"loss": loss})
+                    goodness = optimizer.goodness
+                    tqdm_.set_postfix({"goodness": goodness})
 
         xy_t.detach_()
         print(f"Minimum at: {xy_t}")
 
-    def ars_cartpole_train(self, n_steps=2_000):
+    def ars_cartpole_train(self, n_steps=1_000):
 
         def cart_step_fun(x, action):
             action = np.argmax(action)
@@ -93,31 +94,34 @@ class ARSOptimizerTests:
 
         ars_cartpole_opti = ARSOptimizer(
             parameters=self.cartpole_model.parameters(),
+            n_directions=10,
             fwd_fun=cart_fwd_fun,
             step_fun=cart_step_fun,
             reset_input=lambda params: self.env_train.reset()[0],
             normalizer=self.normalizer,
-            hrz=100
+            hrz=1_000
         )
 
         goodness = - np.inf
-        with tqdm(total=n_steps, postfix={"variance": goodness}) as tqdm_:
+        with tqdm(total=n_steps, postfix={"goodness": goodness}) as tqdm_:
             for t in range(1, n_steps + 1):
                 ars_cartpole_opti.step()
                 tqdm_.update()
                 if t % 10 == 0:
                     goodness = ars_cartpole_opti.goodness
-                    tqdm_.set_postfix({"loss": ars_cartpole_opti.normalizer.cov.sum()})
+                    tqdm_.set_postfix({"goodness": goodness})
 
+        self.normalizer.save_state(f"models/ars/ars_normalizer_{np.round(goodness, 4)}")
         torch.save(self.cartpole_model.state_dict(), f"models/ars/ars_model_{np.round(goodness, 4)}")
 
     def ars_cartpole_evaluate(self):
-        # self.cartpole_model.load_state_dict(torch.load("models/ars/ars_model_0.9"))
+        self.cartpole_model.load_state_dict(torch.load("models/ars/ars_model_0.0102"))
+        self.normalizer.load_state("models/ars/ars_normalizer_0.0102.npz")
         reward_sequence = []
         env = self.env_test
 
         def policy(state):
-            state = self.normalizer.obs_norm(state)
+            state = self.normalizer.normalize(state)
             state = torch.from_numpy(state).float()
             return self.cartpole_model(state)
 
@@ -129,7 +133,6 @@ class ARSOptimizerTests:
                 action = policy(x0)
                 action = action.detach().numpy()
                 action = np.argmax(action)
-                # action = env.action_space.sample()
                 x0, reward, done, _, _ = env.step(action)
                 fitness += reward
 
@@ -141,11 +144,11 @@ class ARSOptimizerTests:
 
 if __name__ == '__main__':
     tester = ARSOptimizerTests()
-    xy_init = (0.3, 0.8)
+    xy_init = (0.3, -0.8)
 
     # tester.opti_rosenbrock(xy_init)
 
-    tester.ars_rosenbrock(xy_init)
+    # tester.ars_rosenbrock(xy_init)
 
     # tester.ars_cartpole_train()
     # tester.ars_cartpole_evaluate()
