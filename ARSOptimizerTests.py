@@ -9,7 +9,7 @@ from ARSOptimizer import ARSOptimizer, Normalizer
 
 def rosenbrock(xy):
     x, y = xy
-    return torch.pow(1 - x, 2) + 1 * torch.pow(y - torch.pow(x, 2), 2)
+    return torch.pow(1 - x, 2) + 100 * torch.pow(y - torch.pow(x, 2), 2)
     # return torch.pow(x, 2) + torch.pow(y, 2)
 
 

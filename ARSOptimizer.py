@@ -12,7 +12,7 @@ from typing import Callable, Optional, Tuple, List
 
 
 class ARSOptimizer(Optimizer):
-    def __init__(self, parameters: Iterator[Tensor], fwd_fun, step_fun, reset_input, step_sz=1E-3, sdv=1,
+    def __init__(self, parameters: Iterator[Tensor], fwd_fun, step_fun, reset_input, step_sz=1E-2, sdv=1E-3,
                  n_directions=20, n_choice=None, hrz=1, normalizer=None):
         self.goodness = None
         assert (n_directions % 2) == 0
@@ -42,6 +42,11 @@ class ARSOptimizer(Optimizer):
         step_sz = param_args["step_sz"]
         Horizon = param_args["hrz"]
         sdv = param_args["sdv"]
+
+        if not self.state["step"]:
+            self.state["step"] = 1
+        else:
+            self.state["step"] += 1
 
         n_choice, n_directions = int(n_choice), int(n_directions)
 
@@ -83,6 +88,7 @@ class ARSOptimizer(Optimizer):
         rwd_minus_sorted = [rwd_minus[idx] for idx in rwd_max_sorted]
 
         # Line 7 of Algorithm
+        # TODO(what to do if this is zero)
         sdv_rwd = np.std([*rwd_plus_sorted[:n_choice], *rwd_minus_sorted[:n_choice]])
         param_length = len(parameters)
 
@@ -92,7 +98,7 @@ class ARSOptimizer(Optimizer):
         ]
 
         changes = [
-            (step_sz / sdv_rwd * n_choice) * torch.stack([
+            (step_sz / (sdv_rwd * n_choice)) * torch.stack([
                 (rwd_plus_sorted[j] - rwd_minus_sorted[j]) * group_deltas[k][j]
                 for j in range(n_choice)
             ]).sum(dim=0)
