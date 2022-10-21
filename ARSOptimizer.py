@@ -13,8 +13,8 @@ from torch.optim import Optimizer
 
 
 class ARSOptimizer(Optimizer):
-    def __init__(self, parameters: Iterator[Tensor], fwd_fun, step_fun, reset_input, step_sz=1E-2, sdv=1E-3,
-                 n_directions=20, n_choice=None, hrz=1, normalizer=None):
+    def __init__(self, parameters: Iterator[Tensor], get_env, get_policy, step_sz=1E-2, sdv=1E-3,
+                 n_directions=50, n_choice=None, hrz=1, normalizer=None):
         self.goodness = -np.inf
         assert (n_directions % 2) == 0
         n_choice = int(n_directions / 2) if n_choice is None else n_choice
@@ -27,9 +27,10 @@ class ARSOptimizer(Optimizer):
         ]
         super().__init__(
             parameters,
-            dict(fwd_fun=fwd_fun, step_fun=step_fun, reset_input=reset_input, step_sz=step_sz, sdv=sdv,
-                 n_directions=n_directions, n_choice=n_choice, hrz=hrz)
+            dict(step_sz=step_sz, sdv=sdv, n_directions=n_directions, n_choice=n_choice, hrz=hrz)
         )
+        self.gen_env = get_env
+        self.get_policy = get_policy
         self.n_input_shape = parameters[0].shape[0]
         self.normalizer = normalizer if normalizer else Normalizer(self.n_input_shape)
 
@@ -48,7 +49,20 @@ class ARSOptimizer(Optimizer):
             self.state["step"] += 1
 
         n_choice, n_directions = int(n_choice), int(n_directions)
+        changes, rwd_minus, rwd_plus = self.ars_step(Horizon, n_choice, n_directions, parameters, sdv, step_sz)
 
+        [
+            tensor.data.add_(change)
+            for (tensor, change) in zip(parameters, changes)
+        ]  # new_params
+
+        step_goodness = np.mean([*rwd_plus, *rwd_minus])
+        if step_goodness > self.goodness:
+            self.goodness = step_goodness
+
+        return None
+
+    def ars_step(self, Horizon, n_choice, n_directions, parameters, sdv, step_sz):
         # Line 4 of Algorithm
         deviations = [
             # i.i.d standard normal distribution
@@ -70,11 +84,11 @@ class ARSOptimizer(Optimizer):
         rollouts_minus = [self.query_oracle(params, Horizon) for params in params_minus]
 
         rwd_plus = [
-            np.mean(np.asarray([tup[2] for tup in rollouts]))
+            np.sum([tup[2] for tup in rollouts])
             for rollouts in rollouts_plus
         ]
         rwd_minus = [
-            np.mean(np.asarray([tup[2] for tup in rollouts]))
+            np.sum([tup[2] for tup in rollouts])
             for rollouts in rollouts_minus
         ]
 
@@ -88,14 +102,12 @@ class ARSOptimizer(Optimizer):
 
         # Line 7 of Algorithm
         # TODO(what to do if this is zero)
-        sdv_rwd = np.std([*rwd_plus_sorted[:n_choice], *rwd_minus_sorted[:n_choice]])
+        sdv_rwd = np.std([*rwd_plus_sorted[:n_choice], *rwd_minus_sorted[:n_choice]]).clip(1E-5)
         param_length = len(parameters)
-
         group_deltas = [
             [deviations_sorted[k][j] for k in range(n_choice)]
             for j in range(param_length)
         ]
-
         changes = [
             (step_sz / (sdv_rwd * n_choice)) * th.stack([
                 (rwd_plus_sorted[j] - rwd_minus_sorted[j]) * group_deltas[k][j]
@@ -104,34 +116,24 @@ class ARSOptimizer(Optimizer):
             for k in range(param_length)
         ]
 
-        [
-            tensor.data.add_(change)
-            for (tensor, change) in zip(parameters, changes)
-        ]  # new_params
-
-        step_goodness = np.mean([*rwd_plus, *rwd_minus])
-        if step_goodness > self.goodness:
-            self.goodness = step_goodness
-
-        return None
+        return changes, rwd_minus, rwd_plus
 
     def query_oracle(self, params, horizon):
-        param_args = np.random.choice(self.param_groups)
-        reset_input = param_args["reset_input"]
-        step_fun = param_args["step_fun"]
-        fwd_fun = param_args["fwd_fun"]
+        get_policy = self.get_policy
+        get_env = self.gen_env
 
-        x_prev = reset_input(params)  # TODO(how this is chosen)
-        triple = []
-        done = False
+        env = get_env(params)
+        x_prev = env.reset()
 
-        for h in range(int(horizon)):
-            if done:
-                triple.append((x_prev, None, 0))
-            else:
-                action = fwd_fun(params, self.normalizer.obs_norm(x_prev))  # Policy predicting action
-                x_prev, rwd, done = step_fun(x_prev, action)  # Environment step function
-                triple.append((x_prev, action, rwd))
+        policy = get_policy(params, self.normalizer)
+
+        triple, done, h = [], False, 0
+        while (not done) and (h < int(horizon)):
+            action = policy(x_prev)
+            x_prev, rwd, done = env.step(action)
+            # rwd += (h * rwd)
+            triple.append((x_prev, action, rwd))
+            h += 1
 
         return triple
 
