@@ -1,10 +1,13 @@
+from collections.abc import Iterator
+
 import gym
 import torch as th
 import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
 from torch.optim import Adam, SGD
-from ARSOptimizer import ARSOptimizer, Normalizer
+from Normalizer import Normalizer
+from ARSOptimizer import ARSOptimizer
 
 
 def rosenbrock(xy):
@@ -21,9 +24,8 @@ class ARSOptimizerTests:
 
         self.normalizer = Normalizer(4)
         self.cartpole_model = th.nn.Sequential(
-            # th.nn.Linear(in_features=4, out_features=5, bias=False),
-            th.nn.Linear(in_features=4, out_features=2, bias=False),
-            th.nn.Tanh()
+            th.nn.Linear(in_features=4, out_features=2, bias=True),
+            th.nn.Tanh(),
         )
 
     def opti_rosenbrock(self, x_init, n_steps=2_000):
@@ -49,7 +51,7 @@ class ARSOptimizerTests:
         xy_t.detach_()
         print(f"Minimum at: {xy_t}")
 
-    def ars_rosenbrock(self, x_init, n_steps=1_000):
+    def ars_rosenbrock(self, x_init, n_steps=5_000):
         self.path = np.empty((n_steps + 1, 2))
         self.path[0, :] = x_init
         xy_t = th.tensor(x_init)
@@ -59,16 +61,18 @@ class ARSOptimizerTests:
                 self.params = params
 
             def reset(self):
-                return self.params[0]
+                return self.params
 
             def step(self, action):
-                x = self.params[0]
+                x = self.params
                 return None, -rosenbrock(x), False
 
         optimizer = ARSOptimizer(
-            [xy_t],
+            xy_t,
             get_env=lambda params: RosenbrockEnv(params),
-            get_policy=(lambda params, normalizer: (lambda x: None))
+            action_sz=1,
+            get_policy=(lambda params, normalizer: (lambda x: None)),
+            sdv=1E-3
         )
 
         with tqdm(total=n_steps, postfix={"loss": th.inf}) as tqdm_:
@@ -84,21 +88,21 @@ class ARSOptimizerTests:
         xy_t.detach_()
         print(f"Minimum at: {xy_t}")
 
-    def ars_cartpole_train(self, n_steps=10_000):
+    def ars_cartpole_train(self, n_steps=2_000):
+        parameters = th.nn.utils.parameters_to_vector(self.cartpole_model.parameters()).detach().cpu()
 
         def get_policy_cart(params, normalizer):
             model = deepcopy(self.cartpole_model)
-            # th.nn.utils.vector_to_parameters(th.FloatTensor(vector), params)
-            # th.nn.utils.parameters_to_vector(self.parameters()).detach().cpu().numpy()
-            # model.load_state_dict(params)
-            # model._parameters = params
-            # print(model.parameters())
+            th.nn.utils.vector_to_parameters(params, model.parameters())
 
             def forward(state):
                 x = normalizer.obs_norm(state)
-                action = model(th.Tensor(x))
-                action = action.detach().numpy()
-                action = np.argmax(action)
+                action = (
+                    model(th.Tensor(x))
+                    .detach()
+                    .numpy()
+                    .argmax()
+                )
                 return action
 
             return forward
@@ -119,12 +123,15 @@ class ARSOptimizerTests:
             return ARSCartEnv(self.env_train)
 
         ars_cartpole_opti = ARSOptimizer(
-            parameters=self.cartpole_model.parameters(),
+            parameters=parameters,
             n_directions=10,
             get_env=get_env_cart,
+            action_sz=4,
+            sdv=0.05,
+            step_sz=0.02,
             get_policy=get_policy_cart,
             normalizer=self.normalizer,
-            hrz=1_000
+            hrz=2_000
         )
 
         goodness = - np.inf
@@ -132,22 +139,25 @@ class ARSOptimizerTests:
             for t in range(1, n_steps + 1):
                 ars_cartpole_opti.step()
                 tqdm_.update()
-                if t % 10 == 0:
-                    goodness = ars_cartpole_opti.goodness
-                    tqdm_.set_postfix({"goodness": goodness})
+                goodness = ars_cartpole_opti.goodness
+                tqdm_.set_postfix({"goodness": goodness})
 
+        th.nn.utils.vector_to_parameters(
+            ars_cartpole_opti.param_groups[0]["params"][0],
+            self.cartpole_model.parameters()
+        )
         self.normalizer.save_state(f"models/ars/ars_normalizer_{np.round(goodness, 2)}")
         th.save(self.cartpole_model.state_dict(), f"models/ars/ars_model_{np.round(goodness, 2)}")
 
     def ars_cartpole_evaluate(self):
-        # self.cartpole_model.load_state_dict(th.load("models/ars/ars_model_40.31"))
-        # self.normalizer.load_state("models/ars/ars_normalizer_40.31.npz")
+        # self.cartpole_model.load_state_dict(th.load("models/ars/ars_model_164.75"))
+        # self.normalizer.load_state("models/ars/ars_normalizer_164.75.npz")
         reward_sequence = []
         env = self.env_test
 
         def policy(state):
             state = self.normalizer.normalize(state)
-            state = th.from_numpy(state).float()
+            state = th.FloatTensor(state)
             return self.cartpole_model(state)
 
         for i in range(100):
