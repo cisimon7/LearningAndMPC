@@ -31,28 +31,24 @@ if __name__ == '__main__':
 
     xy_init = (0.3, -0.8)
     xy_t = th.tensor(xy_init)
+    optimizer = ARSOptimizer(
+        xy_t,
+        get_env=lambda params: RosenbrockEnv(params),
+        action_sz=1,
+        get_policy=(lambda params, normalizer: (lambda x: None)),
+        sdv=1E-3
+    )
 
-    for j in range(10):
-        xy_init = (0.3, -0.8)
-        xy_t = th.tensor(xy_init)
-        optimizer = ARSOptimizer(
-            xy_t,
-            get_env=lambda params: RosenbrockEnv(params),
-            action_sz=1,
-            get_policy=(lambda params, normalizer: (lambda x: None)),
-            sdv=1E-3
-        )
+    with tqdm(total=n_steps, postfix={"loss": th.inf}) as tqdm_updater:
+        for t in range(1, n_steps + 1):
+            optimizer.step()
 
-        with tqdm(total=n_steps, postfix={"loss": th.inf}) as tqdm_updater:
-            for t in range(1, n_steps + 1):
-                optimizer.step()
+            tqdm_updater.update()
+            if t % 10 == 0:
+                goodness = optimizer.goodness
+                tqdm_updater.set_postfix({"goodness": goodness})
 
-                tqdm_updater.update()
-                if t % 10 == 0:
-                    goodness = optimizer.goodness
-                    tqdm_updater.set_postfix({"goodness": goodness})
-
-                writer.add_scalar(f"rosenbrock/{j}", optimizer.goodness, t)
+            writer.add_scalar(f"rosenbrock/ars", optimizer.goodness, t)
 
     xy_t.detach_()
     print(f"Minimum at: {xy_t}")

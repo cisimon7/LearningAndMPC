@@ -78,18 +78,17 @@ def train(steps=100, log_name="reward"):
         ars_cartpole_opti.param_groups[0]["params"][0],
         cartpole_model.parameters()
     )
-    normalizer_main.save_state(f"models/ars/ars_normalizer_{np.round(goodness, 4)}")
-    th.save(cartpole_model.state_dict(), f"models/ars/ars_model_{np.round(goodness, 4)}")
+    normalizer_main.save_state(f"../models/ars/ars_normalizer_{np.round(goodness, 4)}")
+    th.save(cartpole_model.state_dict(), f"../models/ars/ars_model_{np.round(goodness, 4)}")
 
 
 if __name__ == '__main__':
-    for i in range(2):
-        train(steps=100, log_name=f"{i}")
+    # train(steps=100)
 
     env_test = gym.make("CartPole-v1", render_mode="human")
 
-    # cartpole_model.load_state_dict(th.load("../models/ars/ars_model_500.0"))
-    # normalizer.load_state("../models/ars/ars_normalizer_500.0.npz")
+    cartpole_model.load_state_dict(th.load("../models/ars/ars_model_500.0"))
+    normalizer_main.load_state("../models/ars/ars_normalizer_500.0.npz")
     reward_sequence = []
 
 
