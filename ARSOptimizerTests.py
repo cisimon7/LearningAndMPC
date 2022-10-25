@@ -1,14 +1,14 @@
-from collections.abc import Iterator
-
 import gym
 import torch as th
 import numpy as np
-import torch.nn.utils
 from tqdm import tqdm
 from copy import deepcopy
 from torch.optim import Adam, SGD
 from Normalizer import Normalizer
 from ARSOptimizer import ARSOptimizer
+from torch.utils.tensorboard import SummaryWriter
+
+writer = SummaryWriter("logs")
 
 
 def rosenbrock(xy):
@@ -86,6 +86,8 @@ class ARSOptimizerTests:
                     goodness = optimizer.goodness
                     tqdm_.set_postfix({"goodness": goodness})
 
+                writer.add_scalar('rosenbrock', optimizer.goodness, t)
+
         xy_t.detach_()
         print(f"Minimum at: {xy_t}")
 
@@ -140,12 +142,14 @@ class ARSOptimizerTests:
                 goodness = ars_cartpole_opti.goodness
                 tqdm_.set_postfix({"goodness": goodness})
 
+                writer.add_scalar('ars_cart_pole', goodness, t)
+
         th.nn.utils.vector_to_parameters(
             ars_cartpole_opti.param_groups[0]["params"][0],
             self.cartpole_model.parameters()
         )
-        self.normalizer.save_state(f"models/ars/ars_normalizer_{np.round(goodness, 4)}_good")
-        th.save(self.cartpole_model.state_dict(), f"models/ars/ars_model_{np.round(goodness, 4)}_good")
+        self.normalizer.save_state(f"models/ars/ars_normalizer_{np.round(goodness, 4)}")
+        th.save(self.cartpole_model.state_dict(), f"models/ars/ars_model_{np.round(goodness, 4)}")
 
     def ars_cartpole_evaluate(self):
         self.cartpole_model.load_state_dict(th.load("models/ars/ars_model_500.0"))
