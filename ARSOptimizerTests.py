@@ -52,7 +52,7 @@ class ARSOptimizerTests:
         xy_t.detach_()
         print(f"Minimum at: {xy_t}")
 
-    def ars_rosenbrock(self, x_init, n_steps=100):
+    def ars_rosenbrock(self, x_init, n_steps=2_000):
         self.path = np.empty((n_steps + 1, 2))
         self.path[0, :] = x_init
         xy_t = th.tensor(x_init)
@@ -66,7 +66,7 @@ class ARSOptimizerTests:
 
             def step(self, action):
                 x = self.params
-                return None, -rosenbrock(x), False
+                return None, -rosenbrock(x), True
 
         optimizer = ARSOptimizer(
             xy_t,
@@ -129,7 +129,7 @@ class ARSOptimizerTests:
             step_sz=0.02,
             get_policy=get_policy_cart,
             normalizer=self.normalizer,
-            hrz=10
+            hrz=1_000
         )
 
         goodness = - np.inf
@@ -144,12 +144,12 @@ class ARSOptimizerTests:
             ars_cartpole_opti.param_groups[0]["params"][0],
             self.cartpole_model.parameters()
         )
-        # self.normalizer.save_state(f"models/ars/ars_normalizer_{np.round(goodness, 4)}_good")
-        # th.save(self.cartpole_model.state_dict(), f"models/ars/ars_model_{np.round(goodness, 4)}_good")
+        self.normalizer.save_state(f"models/ars/ars_normalizer_{np.round(goodness, 4)}_good")
+        th.save(self.cartpole_model.state_dict(), f"models/ars/ars_model_{np.round(goodness, 4)}_good")
 
     def ars_cartpole_evaluate(self):
-        # self.cartpole_model.load_state_dict(th.load("models/ars/ars_model_500.0_good"))
-        # self.normalizer.load_state("models/ars/ars_normalizer_500.0_good.npz")
+        self.cartpole_model.load_state_dict(th.load("models/ars/ars_model_500.0"))
+        self.normalizer.load_state("models/ars/ars_normalizer_500.0.npz")
         reward_sequence = []
         env = self.env_test
 
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     xy_init = (0.3, -0.8)
 
     # tester.opti_rosenbrock(xy_init)
-    tester.ars_rosenbrock(xy_init)
+    # tester.ars_rosenbrock(xy_init)
 
-    # tester.ars_cartpole_train()
-    # tester.ars_cartpole_evaluate()
+    tester.ars_cartpole_train()
+    tester.ars_cartpole_evaluate()
