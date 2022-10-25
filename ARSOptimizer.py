@@ -1,4 +1,3 @@
-# https://math.stackexchange.com/questions/1147084/dynamic-update-of-co-variance-matrix-upon-new-sample
 # https://arxiv.org/abs/1803.07055
 # page 6
 
@@ -60,7 +59,8 @@ class ARSOptimizer(Optimizer):
         # Line 4 of Algorithm
         # i.i.d standard normal distribution
         # TODO(Deviations should be uniform round the point zero)
-        deltas: List[Tensor] = [th.randn(parameters.shape) for _ in range(n_directions)]
+        # deltas: List[Tensor] = [th.randn(parameters.shape) for _ in range(n_directions)]
+        deltas: List[Tensor] = [th.normal(mean=0.0, std=1.0, size=parameters.shape) for _ in range(n_directions)]
 
         # Line 5 of Algorithm
         params_plus: List[Tensor] = [parameters + (sdv * delta) for delta in deltas]
@@ -81,9 +81,8 @@ class ARSOptimizer(Optimizer):
         rwd_minus_sorted = [rwd_minus[idx] for idx in rwd_max_sorted]
 
         # Line 7 of Algorithm
-        # TODO(what to do if this is zero)
         sdv_rwd = np.std([*rwd_plus_sorted[:n_choice], *rwd_minus_sorted[:n_choice]])
-        changes = (step_sz / (sdv_rwd * n_choice)) * th.stack([
+        changes = (step_sz / (sdv_rwd * n_choice + 1e-6)) * th.stack([
             (rwd_plus_sorted[j] - rwd_minus_sorted[j]) * deviations_sorted[j]
             for j in range(n_choice)
         ]).sum(dim=0)
@@ -102,7 +101,6 @@ class ARSOptimizer(Optimizer):
         while (not done) and (h < int(horizon)):
             action = policy(x_prev)
             x_prev, rwd, done = env.step(action)
-            triple.append((x_prev, action, rwd))
-            h += 1
+            triple.append((x_prev, action, (rwd + 1e-4) ** h))
 
         return triple

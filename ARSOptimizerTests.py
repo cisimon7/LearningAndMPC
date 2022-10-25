@@ -3,6 +3,7 @@ from collections.abc import Iterator
 import gym
 import torch as th
 import numpy as np
+import torch.nn.utils
 from tqdm import tqdm
 from copy import deepcopy
 from torch.optim import Adam, SGD
@@ -25,7 +26,7 @@ class ARSOptimizerTests:
         self.normalizer = Normalizer(4)
         self.cartpole_model = th.nn.Sequential(
             th.nn.Linear(in_features=4, out_features=2, bias=True),
-            th.nn.Tanh(),
+            th.nn.Tanh()
         )
 
     def opti_rosenbrock(self, x_init, n_steps=2_000):
@@ -51,7 +52,7 @@ class ARSOptimizerTests:
         xy_t.detach_()
         print(f"Minimum at: {xy_t}")
 
-    def ars_rosenbrock(self, x_init, n_steps=5_000):
+    def ars_rosenbrock(self, x_init, n_steps=100):
         self.path = np.empty((n_steps + 1, 2))
         self.path[0, :] = x_init
         xy_t = th.tensor(x_init)
@@ -88,7 +89,7 @@ class ARSOptimizerTests:
         xy_t.detach_()
         print(f"Minimum at: {xy_t}")
 
-    def ars_cartpole_train(self, n_steps=2_000):
+    def ars_cartpole_train(self, n_steps=100):
         parameters = th.nn.utils.parameters_to_vector(self.cartpole_model.parameters()).detach().cpu()
 
         def get_policy_cart(params, normalizer):
@@ -96,13 +97,9 @@ class ARSOptimizerTests:
             th.nn.utils.vector_to_parameters(params, model.parameters())
 
             def forward(state):
-                x = normalizer.obs_norm(state)
-                action = (
-                    model(th.Tensor(x))
-                    .detach()
-                    .numpy()
-                    .argmax()
-                )
+                x = state
+                x = normalizer.obs_norm(x)
+                action = model(th.Tensor(x))
                 return action
 
             return forward
@@ -113,6 +110,7 @@ class ARSOptimizerTests:
                     self.env = env
 
                 def step(self, action):
+                    action = np.argmax(action.abs().detach().numpy())
                     x, reward, terminated, truncated, _ = self.env.step(action)
                     done = terminated or truncated
                     return x, reward, done
@@ -124,14 +122,14 @@ class ARSOptimizerTests:
 
         ars_cartpole_opti = ARSOptimizer(
             parameters=parameters,
-            n_directions=10,
+            n_directions=50,
             get_env=get_env_cart,
             action_sz=4,
             sdv=0.05,
             step_sz=0.02,
             get_policy=get_policy_cart,
             normalizer=self.normalizer,
-            hrz=2_000
+            hrz=10
         )
 
         goodness = - np.inf
@@ -146,12 +144,12 @@ class ARSOptimizerTests:
             ars_cartpole_opti.param_groups[0]["params"][0],
             self.cartpole_model.parameters()
         )
-        self.normalizer.save_state(f"models/ars/ars_normalizer_{np.round(goodness, 2)}")
-        th.save(self.cartpole_model.state_dict(), f"models/ars/ars_model_{np.round(goodness, 2)}")
+        # self.normalizer.save_state(f"models/ars/ars_normalizer_{np.round(goodness, 4)}_good")
+        # th.save(self.cartpole_model.state_dict(), f"models/ars/ars_model_{np.round(goodness, 4)}_good")
 
     def ars_cartpole_evaluate(self):
-        # self.cartpole_model.load_state_dict(th.load("models/ars/ars_model_164.75"))
-        # self.normalizer.load_state("models/ars/ars_normalizer_164.75.npz")
+        # self.cartpole_model.load_state_dict(th.load("models/ars/ars_model_500.0_good"))
+        # self.normalizer.load_state("models/ars/ars_normalizer_500.0_good.npz")
         reward_sequence = []
         env = self.env_test
 
@@ -160,14 +158,13 @@ class ARSOptimizerTests:
             state = th.FloatTensor(state)
             return self.cartpole_model(state)
 
-        for i in range(100):
+        for i in range(10):
             x0, _ = env.reset()
 
             done, fitness = False, 0
             while not done:
                 action = policy(x0)
-                action = action.detach().numpy()
-                action = np.argmax(action)
+                action = np.argmax(action.abs().detach().numpy())
                 x0, reward, done, _, _ = env.step(action)
                 fitness += reward
 
@@ -182,7 +179,7 @@ if __name__ == '__main__':
     xy_init = (0.3, -0.8)
 
     # tester.opti_rosenbrock(xy_init)
-    # tester.ars_rosenbrock(xy_init)
+    tester.ars_rosenbrock(xy_init)
 
-    tester.ars_cartpole_train()
-    tester.ars_cartpole_evaluate()
+    # tester.ars_cartpole_train()
+    # tester.ars_cartpole_evaluate()
