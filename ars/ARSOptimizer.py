@@ -7,16 +7,14 @@ from typing import Optional, List, Callable, Any
 import numpy as np
 import torch as th
 from torch import Tensor
-import multiprocessing as mp
-from Normalizer import Normalizer
-
+from .Normalizer import Normalizer
 from torch.optim import Optimizer
 
 
 class ARSOptimizer(Optimizer):
     def __init__(self, parameters: Tensor, get_env, action_sz: int, get_policy: Callable[[Tensor, Normalizer], Any],
                  step_sz=1E-2, sdv=1E-3, n_directions=50, n_choice=None, hrz=1, normalizer=None, alive_bonus=0):
-        self.goodness = -th.inf
+        self.goodness = -np.inf
         assert (n_directions % 2) == 0
         n_choice = int(n_directions / 2) if n_choice is None else n_choice
         assert n_choice <= n_directions
