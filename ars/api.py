@@ -25,9 +25,9 @@ def ars_minimize(
 
         def step(self, action):
             x = self.params
-            return None, - obj_func(x), True
+            return None, - obj_func(x).detach().numpy(), True
 
-    xy_t = th.rand(n_vars)
+    xy_t = th.Tensor([0 for _ in range(n_vars)])
     optimizer = ARSOptimizer(
         xy_t,
         get_env=lambda params: ObjEnv(params),
@@ -61,6 +61,7 @@ def ars_policy_train(
         policy_params_path: str = None,
         normalizer_params_path: str = None,
         on_step: Callable[[float, int], Any] = lambda goodness, step: None,
+        save_on_improve=False
 ):
     obs_dim = train_env.observation_space.shape[0]
     action_dim = 1 if isinstance(train_env.action_space, gym.spaces.Discrete) else train_env.action_space.shape[0]
@@ -101,14 +102,24 @@ def ars_policy_train(
     ars_cartpole_opti = ARSOptimizer(parameters=param_vector, n_directions=50, get_env=get_env, action_sz=4, sdv=0.05,
                                      step_sz=0.02, get_policy=get_policy, normalizer=train_normalizer, hrz=1_000)
 
-    goodness = - np.inf
+    goodness, prev_goodness = - np.inf, - np.inf
     with tqdm(total=train_steps, postfix={"goodness": goodness}) as tqdm_:
         for t in range(1, train_steps + 1):
             ars_cartpole_opti.step()
             tqdm_.update()
             goodness = ars_cartpole_opti.goodness
             tqdm_.set_postfix({"goodness": goodness})
+
             on_step(goodness, t)
+
+            if save_on_improve and goodness > prev_goodness:
+                th.nn.utils.vector_to_parameters(
+                    ars_cartpole_opti.param_groups[0]["params"][0],
+                    train_policy.parameters()
+                )
+                train_normalizer.save_state(policy_params_path + f"_{np.round(goodness, 4)}")
+                th.save(train_policy.state_dict(), normalizer_params_path + f"_{np.round(goodness, 4)}")
+                prev_goodness = goodness
 
     th.nn.utils.vector_to_parameters(
         ars_cartpole_opti.param_groups[0]["params"][0],
