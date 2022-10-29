@@ -23,30 +23,29 @@ class ConstScaleLayer(th.nn.Module):
         return tensor * self.constant
 
 
-# humanoid_policy = th.nn.Sequential(
-#     th.nn.Linear(in_features=376, out_features=17, bias=True),
-#     th.nn.Tanh(),
-#     ConstScaleLayer(constant=0.4)
-# )
-
-
 humanoid_policy = th.nn.Sequential(
-    th.nn.Linear(in_features=376, out_features=752, bias=True),
-    th.nn.Tanh(),
-    th.nn.Linear(in_features=752, out_features=752, bias=True),
-    th.nn.Tanh(),
-    th.nn.Linear(in_features=752, out_features=376, bias=True),
-    th.nn.Tanh(),
-    th.nn.Linear(in_features=376, out_features=376, bias=True),
-    th.nn.Tanh(),
-    th.nn.Linear(in_features=376, out_features=188, bias=True),
-    th.nn.Tanh(),
-    th.nn.Linear(in_features=188, out_features=47, bias=True),
-    th.nn.Tanh(),
-    th.nn.Linear(in_features=47, out_features=17, bias=True),
+    th.nn.Linear(in_features=376, out_features=17, bias=True),
     th.nn.Tanh(),
     ConstScaleLayer(constant=0.4)
 )
+
+# humanoid_policy = th.nn.Sequential(
+#     th.nn.Linear(in_features=376, out_features=752, bias=True),
+#     th.nn.Tanh(),
+#     th.nn.Linear(in_features=752, out_features=752, bias=True),
+#     th.nn.Tanh(),
+#     th.nn.Linear(in_features=752, out_features=376, bias=True),
+#     th.nn.Tanh(),
+#     th.nn.Linear(in_features=376, out_features=376, bias=True),
+#     th.nn.Tanh(),
+#     th.nn.Linear(in_features=376, out_features=188, bias=True),
+#     th.nn.Tanh(),
+#     th.nn.Linear(in_features=188, out_features=47, bias=True),
+#     th.nn.Tanh(),
+#     th.nn.Linear(in_features=47, out_features=17, bias=True),
+#     th.nn.Tanh(),
+#     ConstScaleLayer(constant=0.4)
+# )
 
 if __name__ == '__main__':
     # ars_policy_train(
@@ -62,7 +61,7 @@ if __name__ == '__main__':
     ars_policy_eval(
         eval_env=gym.make("Humanoid-v4", render_mode="human", terminate_when_unhealthy=True),
         eval_policy=humanoid_policy,
-        policy_params_path="../models/humanoid/goodness2__501.8818",
-        normalizer_params_path="../models/humanoid/goodness2__501.8818.npz",
-        eval_steps=20
+        policy_params_path="../models/humanoid/goodness__1188",
+        normalizer_params_path="../models/humanoid/goodness__1188.npz",
+        eval_steps=1_000
     )

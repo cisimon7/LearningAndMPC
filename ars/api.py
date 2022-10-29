@@ -159,8 +159,8 @@ def ars_policy_eval(
         return eval_policy(state)
 
     for i in range(eval_steps):
-        x0, _ = eval_env.reset()
 
+        x0, _ = eval_env.reset()
         done, fitness = False, 0
         while not done:
             action = policy(x0)
