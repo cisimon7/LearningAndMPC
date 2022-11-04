@@ -1,11 +1,23 @@
+from functools import partial
 from time import sleep
 
 import torch as th
+from torch import Tensor
+from torch.utils.tensorboard import SummaryWriter
 
-from ars.api import ars_minimize
-
+from ars import ars_minimize
 
 # Unconstrained optimization problems
+
+writer = SummaryWriter("../../logs/ars/minimization")
+
+
+def tensor_board(title: str, params: Tensor, goodness: float, count: int):
+    values = params.tolist()
+    names = [f"x{i}" for i in range(len(values))]
+
+    writer.add_scalar(title + "/objective", goodness, count)
+    writer.add_scalars(title + "/parameters", dict(zip(names, values)), count)
 
 
 def rosenbrock(xy):
@@ -25,6 +37,7 @@ if __name__ == '__main__':
         obj_func=rosenbrock,
         n_vars=2,
         n_steps=1_000,
+        on_step=partial(tensor_board, "Rosenbrock")
     )
 
     sleep(0.01)
@@ -33,4 +46,5 @@ if __name__ == '__main__':
         obj_func=quadratic_program,
         n_vars=3,
         n_steps=1_000,
+        on_step=partial(tensor_board, "Quadratic")
     )
