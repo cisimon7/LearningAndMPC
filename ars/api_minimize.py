@@ -23,7 +23,7 @@ class MinimizationEnv:
     def step(self, action):
         """
         The reward function is simply the negative of the objective function at the current values of the minimization
-        arguments
+        arguments. Unlike RL problems, we do not need to define a policy for this problem.
         :param action: Action isn't needed for the minimization problem
         :return: A tuple of (next_state, reward, done)
         """
@@ -39,7 +39,7 @@ def ars_minimize(
         **ars_opti_kwargs
 ):
     """
-    Unconstrained Optimization problem formulation using the ARS algorithm
+    Unconstrained Optimization problem formulation using the ARS algorithm.
     :param obj_func: Objective function to be minimized
     :param n_vars:  number of minimization args
     :param n_steps: Number of optimization steps to be taken
@@ -51,7 +51,7 @@ def ars_minimize(
         xy_t,
         get_env=lambda params: MinimizationEnv(params, obj_func),
         action_sz=1,
-        get_policy=(lambda params, normalizer: (lambda x: None)),
+        get_policy=(lambda params, normalizer: (lambda x: None)),  # No need for a policy
         sdv=1E-3,
         **ars_opti_kwargs
     )
