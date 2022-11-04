@@ -180,5 +180,3 @@ def ars_policy_eval(
 
     avg_reward = np.mean(reward_sequence)
     print(f"Final {avg_reward=}")
-
-    # My name is Simon
