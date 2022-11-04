@@ -34,7 +34,7 @@ if __name__ == '__main__':
         train_policy=cartpole_model,
         train_steps=100,
         policy_post_process=lambda action: np.argmax(action.abs().detach().numpy()),
-        on_step=partial(tensor_board, "CartPole"),
+        # on_step=partial(tensor_board, "CartPole"),
         save_on_improve=True,
         policy_params_path="../models/cartpole/temp_",
         normalizer_params_path="../models/cartpole/temp_"
