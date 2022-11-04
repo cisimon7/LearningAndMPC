@@ -7,8 +7,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 from ars import ars_minimize
 
-# Unconstrained optimization problems
-
 writer = SummaryWriter("../../logs/ars/minimization")
 
 
@@ -33,11 +31,13 @@ def quadratic_program(x: th.Tensor):
 
 
 if __name__ == '__main__':
+    # Unconstrained optimization problems
+
     ars_minimize(
         obj_func=rosenbrock,
         n_vars=2,
         n_steps=1_000,
-        on_step=partial(tensor_board, "Rosenbrock")
+        # on_step=partial(tensor_board, "Rosenbrock")
     )
 
     sleep(0.01)
@@ -46,5 +46,5 @@ if __name__ == '__main__':
         obj_func=quadratic_program,
         n_vars=3,
         n_steps=1_000,
-        on_step=partial(tensor_board, "Quadratic")
+        # on_step=partial(tensor_board, "Quadratic")
     )

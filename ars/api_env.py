@@ -4,6 +4,7 @@ from typing import Callable, Any
 import gym
 import numpy as np
 import torch as th
+from torch import Tensor
 from tqdm import tqdm
 from .Normalizer import Normalizer
 from .ARSOptimizer import ARSOptimizer
@@ -12,12 +13,13 @@ from .ARSOptimizer import ARSOptimizer
 def ars_policy_train(
         train_env: gym.Env,
         train_policy: th.nn.Module,
-        policy_post_process: Callable[[th.Tensor], np.ndarray] = lambda tensor: tensor.detach().numpy(),
+        policy_post_process: Callable[[Tensor], np.ndarray] = lambda tensor: tensor.detach().numpy(),
         train_normalizer: Normalizer = None,
         train_steps=100,
         policy_params_path: str = None,
         normalizer_params_path: str = None,
-        on_step: Callable[[float, int], Any] = lambda goodness, step: None,
+        # on_step: Callable[[float, int], Any] = lambda goodness, step: None,
+        on_step: Callable[[Tensor, float, int], Any] = lambda goodness: None,
         save_on_improve=False
 ):
     obs_dim = train_env.observation_space.shape[0]
@@ -67,7 +69,7 @@ def ars_policy_train(
             goodness = ars_cartpole_opti.goodness
             tqdm_.set_postfix({"goodness": goodness})
 
-            on_step(goodness, t)
+            on_step(ars_cartpole_opti.param_groups[0]["params"][0], goodness, t)
 
             if save_on_improve and goodness > prev_goodness:
                 th.nn.utils.vector_to_parameters(
