@@ -29,24 +29,6 @@ humanoid_policy = th.nn.Sequential(
     ConstScaleLayer(constant=0.4)
 )
 
-# humanoid_policy = th.nn.Sequential(
-#     th.nn.Linear(in_features=376, out_features=752, bias=True),
-#     th.nn.Tanh(),
-#     th.nn.Linear(in_features=752, out_features=752, bias=True),
-#     th.nn.Tanh(),
-#     th.nn.Linear(in_features=752, out_features=376, bias=True),
-#     th.nn.Tanh(),
-#     th.nn.Linear(in_features=376, out_features=376, bias=True),
-#     th.nn.Tanh(),
-#     th.nn.Linear(in_features=376, out_features=188, bias=True),
-#     th.nn.Tanh(),
-#     th.nn.Linear(in_features=188, out_features=47, bias=True),
-#     th.nn.Tanh(),
-#     th.nn.Linear(in_features=47, out_features=17, bias=True),
-#     th.nn.Tanh(),
-#     ConstScaleLayer(constant=0.4)
-# )
-
 if __name__ == '__main__':
     # ars_policy_train(
     #     train_env=gym.make("Humanoid-v4"),

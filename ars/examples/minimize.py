@@ -1,3 +1,5 @@
+from time import sleep
+
 import torch as th
 
 from ars.api import ars_minimize
@@ -19,13 +21,16 @@ def quadratic_program(x: th.Tensor):
 
 
 if __name__ == '__main__':
-    # ars_minimize(
-    #     obj_func=rosenbrock,
-    #     n_vars=2
-    # )
+    ars_minimize(
+        obj_func=rosenbrock,
+        n_vars=2,
+        n_steps=1_000,
+    )
+
+    sleep(0.01)
 
     ars_minimize(
         obj_func=quadratic_program,
         n_vars=3,
-        n_steps=1_000
+        n_steps=1_000,
     )

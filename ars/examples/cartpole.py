@@ -17,22 +17,22 @@ cartpole_model = th.nn.Sequential(
 )
 
 if __name__ == '__main__':
-    # ars_policy_train(
-    #     train_env=gym.make("CartPole-v1"),
-    #     train_policy=cartpole_model,
-    #     train_steps=100,
-    #     policy_post_process=lambda action: np.argmax(action.abs().detach().numpy()),
-    #     on_step=lambda fitness, step: writer.add_scalar("humanoid", fitness, step),
-    #     save_on_improve=True,
-    #     policy_params_path="../models/cartpole/goodness_",
-    #     normalizer_params_path="../models/cartpole/goodness_"
-    # )
+    ars_policy_train(
+        train_env=gym.make("CartPole-v1"),
+        train_policy=cartpole_model,
+        train_steps=100,
+        policy_post_process=lambda action: np.argmax(action.abs().detach().numpy()),
+        # on_step=lambda fitness, step: writer.add_scalar("humanoid", fitness, step),
+        save_on_improve=True,
+        policy_params_path="../models/cartpole/temp_",
+        normalizer_params_path="../models/cartpole/temp_"
+    )
     ars_policy_eval(
         eval_env=gym.make("CartPole-v1", render_mode="human"),
         eval_policy=cartpole_model,
         eval_normalizer=normalizer_main,
         policy_post_process=lambda action: np.argmax(action.abs().detach().numpy()),
-        policy_params_path="../models/cartpole/goodness__500.0",
-        normalizer_params_path="../models/cartpole/goodness__500.0.npz",
+        # policy_params_path="../models/cartpole/goodness__500.0",
+        # normalizer_params_path="../models/cartpole/goodness__500.0.npz",
         eval_steps=100
     )

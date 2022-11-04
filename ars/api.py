@@ -1,6 +1,8 @@
 from copy import deepcopy
+from functools import partial
 from typing import Callable, Any
 
+import functorch
 import gym
 import numpy as np
 import torch as th
@@ -25,7 +27,7 @@ def ars_minimize(
 
         def step(self, action):
             x = self.params
-            return None, - obj_func(x).detach().numpy(), True
+            return None, - obj_func(x), True
 
     xy_t = th.Tensor([0 for _ in range(n_vars)])
     optimizer = ARSOptimizer(
@@ -43,8 +45,8 @@ def ars_minimize(
 
             tqdm_updater.update()
             goodness = optimizer.goodness
-            if t % 10 == 0:
-                tqdm_updater.set_postfix({"goodness": goodness})
+            # if t % 10 == 0:
+            tqdm_updater.set_postfix({"goodness": goodness})
 
             on_step(goodness)
 
@@ -69,10 +71,14 @@ def ars_policy_train(
     if train_normalizer is None:
         train_normalizer = Normalizer(obs_dim)
 
+    # TODO(Probably why model parameter not updating in place)
     param_vector = th.nn.utils.parameters_to_vector(train_policy.parameters()).detach().cpu()
 
     def get_policy(params, normalizer):
         model = deepcopy(train_policy)
+        print(params.shape)
+        # TODO(Look into composing the models for the batch equivalent)
+        # TODO(Look into vmap the vector_to_parameters function for the batching)
         th.nn.utils.vector_to_parameters(params, model.parameters())
 
         def forward(state):
@@ -112,7 +118,7 @@ def ars_policy_train(
 
             on_step(goodness, t)
 
-            if save_on_improve and goodness > prev_goodness:
+            if save_on_improve and (goodness > prev_goodness):
                 th.nn.utils.vector_to_parameters(
                     ars_cartpole_opti.param_groups[0]["params"][0],
                     train_policy.parameters()
