@@ -35,7 +35,7 @@ def ars_minimize(
         obj_func: Callable,
         n_vars=1,
         n_steps=1_000,
-        on_step: Callable[[Tensor, float, int], Any] = lambda goodness: None,
+        on_step: Callable[[Tensor, float, int], Any] = lambda params, goodness, count: None,
         **ars_opti_kwargs
 ):
     """
