@@ -27,7 +27,7 @@ if __name__ == '__main__':
         n_steps=1_000,
     )
 
-    sleep(0.01)
+    sleep(0.05)
 
     ars_minimize(
         obj_func=quadratic_program,

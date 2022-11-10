@@ -74,12 +74,37 @@ def ars_policy_train(
     # TODO(Probably why model parameter not updating in place)
     param_vector = th.nn.utils.parameters_to_vector(train_policy.parameters()).detach().cpu()
 
-    def get_policy(params, normalizer):
+    def get_policy(parameters, normalizer):
         model = deepcopy(train_policy)
-        print(params.shape)
         # TODO(Look into composing the models for the batch equivalent)
         # TODO(Look into vmap the vector_to_parameters function for the batching)
-        th.nn.utils.vector_to_parameters(params, model.parameters())
+        # th.nn.utils.vector_to_parameters(parameters, model.parameters())
+
+        # Split param into sequences like in params
+        start = 0
+        param_groups = []
+        for param in model.parameters():
+            layer = parameters.index_select(0, th.arange(start=start, end=start + param.numel()))
+            param_groups += [layer]
+            start += param.numel()
+
+        # for module in model.modules():
+        #     print(sum(1 for _ in module.parameters()))
+
+        # assign params to splits
+        # TODO(instead of creating model, make it a multiplication thing)
+        # for (param, vec) in zip(model.parameters(), param_groups):
+        #     param.data = vec
+
+        # model.apply(
+        #
+        # )
+
+        # pointer = 0
+        # for param in model.parameters():
+        #     num_param = param.numel()
+        #     param.data = parameters[pointer:pointer + num_param].view_as(param).data
+        #     pointer += num_param
 
         def forward(state):
             x = state
@@ -98,7 +123,7 @@ def ars_policy_train(
             def step(self, action):
                 x, reward, terminated, truncated, _ = self.env.step(action)
                 done = terminated or truncated
-                return x, reward, done
+                return x, th.Tensor([reward]), done
 
             def reset(self):
                 return self.env.reset()[0]

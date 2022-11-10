@@ -23,9 +23,9 @@ if __name__ == '__main__':
         train_steps=100,
         policy_post_process=lambda action: np.argmax(action.abs().detach().numpy()),
         # on_step=lambda fitness, step: writer.add_scalar("humanoid", fitness, step),
-        save_on_improve=True,
-        policy_params_path="../models/cartpole/temp_",
-        normalizer_params_path="../models/cartpole/temp_"
+        # policy_params_path="../models/cartpole/temp_",
+        # normalizer_params_path="../models/cartpole/temp_"
+        save_on_improve=False,
     )
     ars_policy_eval(
         eval_env=gym.make("CartPole-v1", render_mode="human"),
