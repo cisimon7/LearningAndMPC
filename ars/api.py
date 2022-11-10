@@ -1,8 +1,6 @@
 from copy import deepcopy
-from functools import partial
 from typing import Callable, Any
 
-import functorch
 import gym
 import numpy as np
 import torch as th
@@ -32,9 +30,9 @@ def ars_minimize(
     xy_t = th.Tensor([0 for _ in range(n_vars)])
     optimizer = ARSOptimizer(
         xy_t,
-        get_env=lambda params: ObjEnv(params),
+        env=lambda params: ObjEnv(params),
         action_sz=1,
-        get_policy=(lambda params, normalizer: (lambda x: None)),
+        policy=(lambda params, normalizer: (lambda x: None)),
         sdv=1E-3,
         **ars_opti_kwargs
     )
@@ -57,13 +55,13 @@ def ars_minimize(
 def ars_policy_train(
         train_env: gym.Env,
         train_policy: th.nn.Module,
-        policy_post_process: Callable[[th.Tensor], np.ndarray] = lambda tensor: tensor.detach().numpy(),
         train_normalizer: Normalizer = None,
         train_steps=100,
         policy_params_path: str = None,
         normalizer_params_path: str = None,
         on_step: Callable[[float, int], Any] = lambda goodness, step: None,
-        save_on_improve=False
+        save_on_improve=False,
+        n_directions=100
 ):
     obs_dim = train_env.observation_space.shape[0]
     action_dim = 1 if isinstance(train_env.action_space, gym.spaces.Discrete) else train_env.action_space.shape[0]
@@ -74,64 +72,20 @@ def ars_policy_train(
     # TODO(Probably why model parameter not updating in place)
     param_vector = th.nn.utils.parameters_to_vector(train_policy.parameters()).detach().cpu()
 
-    def get_policy(parameters, normalizer):
-        model = deepcopy(train_policy)
-        # TODO(Look into composing the models for the batch equivalent)
-        # TODO(Look into vmap the vector_to_parameters function for the batching)
-        # th.nn.utils.vector_to_parameters(parameters, model.parameters())
+    class WrapperModule(th.nn.Module):
+        def __init__(self):
+            super(WrapperModule, self).__init__()
+            self.model = deepcopy(train_policy)
 
-        # Split param into sequences like in params
-        start = 0
-        param_groups = []
-        for param in model.parameters():
-            layer = parameters.index_select(0, th.arange(start=start, end=start + param.numel()))
-            param_groups += [layer]
-            start += param.numel()
-
-        # for module in model.modules():
-        #     print(sum(1 for _ in module.parameters()))
-
-        # assign params to splits
-        # TODO(instead of creating model, make it a multiplication thing)
-        # for (param, vec) in zip(model.parameters(), param_groups):
-        #     param.data = vec
-
-        # model.apply(
-        #
-        # )
-
-        # pointer = 0
-        # for param in model.parameters():
-        #     num_param = param.numel()
-        #     param.data = parameters[pointer:pointer + num_param].view_as(param).data
-        #     pointer += num_param
-
-        def forward(state):
+        def forward(self, state):
             x = state
-            x = normalizer.obs_norm(x)
-            action = model(th.Tensor(x))
-            action = policy_post_process(action)
+            x = train_normalizer.obs_norm(x)  # TODO(Look into using normalization of gym environment)
+            action = self.model(th.Tensor(x))
             return action
 
-        return forward
-
-    def get_env(params):
-        class ARSEnv:
-            def __init__(self, env: gym.Env):
-                self.env = env
-
-            def step(self, action):
-                x, reward, terminated, truncated, _ = self.env.step(action)
-                done = terminated or truncated
-                return x, th.Tensor([reward]), done
-
-            def reset(self):
-                return self.env.reset()[0]
-
-        return ARSEnv(train_env)
-
-    ars_cartpole_opti = ARSOptimizer(parameters=param_vector, n_directions=50, get_env=get_env, action_sz=4, sdv=0.05,
-                                     step_sz=0.02, get_policy=get_policy, normalizer=train_normalizer, hrz=1_000)
+    ars_cartpole_opti = ARSOptimizer(parameters=param_vector, n_directions=n_directions, env=train_env, action_sz=4,
+                                     sdv=0.05, step_sz=0.02, policy=train_policy, normalizer=train_normalizer,
+                                     hrz=100)
 
     goodness, prev_goodness = - np.inf, - np.inf
     with tqdm(total=train_steps, postfix={"goodness": goodness}) as tqdm_:

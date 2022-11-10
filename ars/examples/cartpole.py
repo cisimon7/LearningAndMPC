@@ -11,9 +11,20 @@ env_train = gym.make("CartPole-v1")
 env_train.reset()
 
 normalizer_main = Normalizer(4)
+
+
+class ArgMaxModule(th.nn.Module):
+    def __init__(self):
+        super(ArgMaxModule, self).__init__()
+
+    def forward(self, x: th.Tensor):
+        return x.argmax()
+
+
 cartpole_model = th.nn.Sequential(
     th.nn.Linear(in_features=4, out_features=2, bias=True),
-    th.nn.Tanh()
+    th.nn.Tanh(),
+    ArgMaxModule()
 )
 
 if __name__ == '__main__':
@@ -21,7 +32,6 @@ if __name__ == '__main__':
         train_env=gym.make("CartPole-v1"),
         train_policy=cartpole_model,
         train_steps=100,
-        policy_post_process=lambda action: np.argmax(action.abs().detach().numpy()),
         # on_step=lambda fitness, step: writer.add_scalar("humanoid", fitness, step),
         # policy_params_path="../models/cartpole/temp_",
         # normalizer_params_path="../models/cartpole/temp_"
