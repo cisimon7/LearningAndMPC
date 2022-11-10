@@ -19,7 +19,7 @@ def ars_policy_train(
         policy_params_path: str = None,
         normalizer_params_path: str = None,
         # on_step: Callable[[float, int], Any] = lambda goodness, step: None,
-        on_step: Callable[[Tensor, float, int], Any] = lambda goodness: None,
+        on_step: Callable[[Tensor, float, int], Any] = lambda params, goodness, count: None,
         save_on_improve=False
 ):
     obs_dim = train_env.observation_space.shape[0]
@@ -58,7 +58,7 @@ def ars_policy_train(
 
         return ARSEnv(train_env)
 
-    ars_cartpole_opti = ARSOptimizer(parameters=param_vector, n_directions=50, get_env=get_env, action_sz=4, sdv=0.05,
+    ars_cartpole_opti = ARSOptimizer(parameters=param_vector, n_directions=100, get_env=get_env, action_sz=4, sdv=0.05,
                                      step_sz=0.02, get_policy=get_policy, normalizer=train_normalizer, hrz=1_000)
 
     goodness, prev_goodness = - np.inf, - np.inf
