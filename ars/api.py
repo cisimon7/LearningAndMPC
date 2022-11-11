@@ -1,9 +1,11 @@
+from abc import ABC
 from copy import deepcopy
-from typing import Callable, Any
+from typing import Callable, Any, Tuple
 
 import gym
 import numpy as np
 import torch as th
+from gym.core import ObsType, ActType
 from tqdm import tqdm
 from .Normalizer import Normalizer
 from .ARSOptimizer import ARSOptimizer
@@ -16,23 +18,35 @@ def ars_minimize(
         on_step: Callable[[float], Any] = lambda goodness: None,
         **ars_opti_kwargs
 ):
-    class ObjEnv:
-        def __init__(self, params):
-            self.params = params
+    class MinimizationEnv(gym.Env, ABC):
+        def __init__(self):
+            self.observation_space = gym.spaces.Discrete(1)
+            self.action_space = gym.spaces.Box(
+                low=np.array([-np.inf for _ in range(n_vars)]),
+                high=np.array([np.inf for _ in range(n_vars)])
+            )
 
-        def reset(self):
-            return self.params
+        def reset(self, seed=None, options=None) -> Tuple[ObsType, dict]:
+            return 0, {}
 
-        def step(self, action):
-            x = self.params
-            return None, - obj_func(x), True
+        def step(self, min_args: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
+            reward = - obj_func(th.from_numpy(min_args))
+            return 0, reward.numpy(), True, False, {}
 
-    xy_t = th.Tensor([0 for _ in range(n_vars)])
+    class MinimizationPolicy(th.nn.Module):
+        def __init__(self):
+            super(MinimizationPolicy, self).__init__()
+            self.min_args = th.nn.Parameter(th.Tensor([0 for _ in range(n_vars)]))
+
+        def forward(self, nothing):
+            return self.min_args
+
+    policy = MinimizationPolicy()
     optimizer = ARSOptimizer(
-        xy_t,
-        env=lambda params: ObjEnv(params),
+        policy.min_args,
+        env=MinimizationEnv(),
         action_sz=1,
-        policy=(lambda params, normalizer: (lambda x: None)),
+        policy=policy,
         sdv=1E-3,
         **ars_opti_kwargs
     )
@@ -43,13 +57,10 @@ def ars_minimize(
 
             tqdm_updater.update()
             goodness = optimizer.goodness
-            # if t % 10 == 0:
             tqdm_updater.set_postfix({"goodness": goodness})
-
             on_step(goodness)
 
-    xy_t.detach_()
-    print(f"Minimum at: {xy_t}")
+    print(f"Minimum at: {policy.min_args.detach().numpy()}")
 
 
 def ars_policy_train(
@@ -85,7 +96,7 @@ def ars_policy_train(
 
     ars_cartpole_opti = ARSOptimizer(parameters=param_vector, n_directions=n_directions, env=train_env, action_sz=4,
                                      sdv=0.05, step_sz=0.02, policy=train_policy, normalizer=train_normalizer,
-                                     hrz=100)
+                                     hrz=1_000)
 
     goodness, prev_goodness = - np.inf, - np.inf
     with tqdm(total=train_steps, postfix={"goodness": goodness}) as tqdm_:

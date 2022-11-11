@@ -2,18 +2,19 @@
 # page 6
 import copy
 import math
-from typing import Optional, List, Callable, Any
+from typing import Optional
 
-import functorch as fth
 import gym
 import numpy as np
 import torch as th
+import functorch as fth
 from torch import Tensor
-from functools import partial
-from .Normalizer import Normalizer
 from torch.optim import Optimizer
 
+from .Normalizer import Normalizer
 
+
+# Is it good practise to use @dataclass for the purpose of avoiding having to do all these self. things?
 class ARSOptimizer(Optimizer):
     def __init__(self, parameters: Tensor, env: gym.Env, action_sz: int, policy: th.nn.Module, step_sz=1E-2, sdv=1E-3,
                  n_directions=50, n_choice=None, hrz=1, normalizer=None, alive_bonus=0):
@@ -64,15 +65,16 @@ class ARSOptimizer(Optimizer):
 
     def vec_query_oracle(self, parameters, horizon: int) -> Tensor:
         observations, _ = self.vec_envs.reset()
-
         rewards, done, step = None, False, 0
+
         while step < horizon:
             step += 1
             if done:
                 rewards = np.vstack([rewards, np.zeros(self.n_directions)])
             else:
-                actions: Tensor = fth.vmap(self.vec_models)(self.vec_params, self.vec_buffers,
-                                                            th.from_numpy(observations))
+                actions: Tensor = fth.vmap(self.vec_models)(
+                    parameters, self.vec_buffers, th.from_numpy(observations)
+                )
                 observations, rwds, terminated, truncated, infos = self.vec_envs.step(actions.numpy())
 
                 rewards = np.vstack([rwds]) if rewards is None else np.vstack([rewards, rwds])
