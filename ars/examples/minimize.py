@@ -1,5 +1,6 @@
-from time import sleep
+from time import sleep, time
 
+import numpy as np
 import torch as th
 
 from ars.api import ars_minimize
@@ -34,3 +35,16 @@ if __name__ == '__main__':
         n_vars=3,
         n_steps=1_000,
     )
+
+    # x = th.ones((10_000, 10_000), device="mps")
+    # y = th.ones((10_000, 10_000), device="mps")
+    #
+    # start_time = time()
+    #
+    # for _ in range(100):
+    #     start_time1 = time()
+    #     th.mul(x, y)
+    #     print(time() - start_time1)
+    #
+    # end_time = time()
+    # print(end_time - start_time)

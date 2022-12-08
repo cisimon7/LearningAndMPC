@@ -43,12 +43,11 @@ class ARSOptimizer(Optimizer):
         self.Horizon = hrz
         self.sdv = sdv
 
-        self.vec_envs = gym.vector.SyncVectorEnv([lambda: env for _ in range(n_directions)])
-        # Wrap environment to return tensor observations and receive tensor actions
+        self.vec_env = gym.vector.SyncVectorEnv([lambda: env for _ in range(n_directions)])
 
         self.vec_models, self.vec_params, self.vec_buffers = fth.combine_state_for_ensemble(
             [copy.deepcopy(policy) for _ in range(n_directions)]
-        )
+        )  # TODO(Model not changing on each step)
 
         self.shapes = []
         for param in self.vec_params:
@@ -64,21 +63,31 @@ class ARSOptimizer(Optimizer):
         return parameters
 
     def vec_query_oracle(self, parameters, horizon: int) -> Tensor:
-        observations, _ = self.vec_envs.reset()
+        observations, _ = self.vec_env.reset()
         rewards, done, step = None, False, 0
 
-        while step < horizon:
+        # TODO(
+        #   ⦿ do we really have to go through the whole horizon?
+        #   ⦿ could just append the zeros at end
+        #   ⦿ what does documentation say
+        #   ⦿ Each env can be wrapped to return zero reward if done
+        #  )
+        # TODO(is a while loop really functional)
+        while (step < horizon) and not done:
             step += 1
-            if done:
-                rewards = np.vstack([rewards, np.zeros(self.n_directions)])
-            else:
-                actions: Tensor = fth.vmap(self.vec_models)(
-                    parameters, self.vec_buffers, th.from_numpy(observations)
-                )
-                observations, rwds, terminated, truncated, infos = self.vec_envs.step(actions.numpy())
+            actions: Tensor = fth.vmap(self.vec_models)(
+                parameters, self.vec_buffers, th.from_numpy(observations)
+            )
+            observations, rwds, terminated, truncated, infos = self.vec_env.step(actions.numpy())
 
-                rewards = np.vstack([rwds]) if rewards is None else np.vstack([rewards, rwds])
-                done = np.all(terminated) or np.all(truncated)
+            rewards = np.vstack([rwds]) if rewards is None else np.vstack([rewards, rwds])
+            done = np.all(terminated) or np.all(truncated)  # Bug(here)
+
+        if step != horizon:
+            rewards = np.vstack([
+                rewards,
+                np.zeros(shape=(horizon - step, self.n_directions))
+            ])
 
         return th.from_numpy(rewards)
 
@@ -90,7 +99,7 @@ class ARSOptimizer(Optimizer):
             # Line 4 of Algorithm: i.i.d standard normal distribution
             deltas = th.normal(mean=0.0, std=1.0, size=(self.n_directions, *parameters.shape))
 
-            # Line 5 of Algorithm TODO(Look into using vmap)
+            # Line 5 of Algorithm
             deltas_plus = parameters + (self.sdv * deltas)
             deltas_minus = parameters - (self.sdv * deltas)
 

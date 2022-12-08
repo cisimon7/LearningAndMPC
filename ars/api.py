@@ -5,19 +5,15 @@ from typing import Callable, Any, Tuple
 import gym
 import numpy as np
 import torch as th
+from torch import Tensor
 from gym.core import ObsType, ActType
 from tqdm import tqdm
 from .Normalizer import Normalizer
 from .ARSOptimizer import ARSOptimizer
 
 
-def ars_minimize(
-        obj_func: Callable,
-        n_vars=1,
-        n_steps=1_000,
-        on_step: Callable[[float], Any] = lambda goodness: None,
-        **ars_opti_kwargs
-):
+def ars_minimize(obj_func: Callable, n_vars, n_steps=1_000, on_step: Callable[[float], Any] = lambda goodness: None,
+                 **ars_opti_kwargs):
     class MinimizationEnv(gym.Env, ABC):
         def __init__(self):
             self.observation_space = gym.spaces.Discrete(1)
@@ -38,7 +34,7 @@ def ars_minimize(
             super(MinimizationPolicy, self).__init__()
             self.min_args = th.nn.Parameter(th.Tensor([0 for _ in range(n_vars)]))
 
-        def forward(self, nothing):
+        def forward(self, nothing: Tensor = None):
             return self.min_args
 
     policy = MinimizationPolicy()
@@ -67,13 +63,32 @@ def ars_policy_train(
         train_env: gym.Env,
         train_policy: th.nn.Module,
         train_normalizer: Normalizer = None,
-        train_steps=100,
+        train_steps=1_000,
         policy_params_path: str = None,
         normalizer_params_path: str = None,
         on_step: Callable[[float, int], Any] = lambda goodness, step: None,
         save_on_improve=False,
         n_directions=100
 ):
+    # TODO(Consider moving this into the optimizer class)
+    class ZeroRewardOnDoneWrapper(gym.Wrapper):
+        def __init__(self, env):
+            super().__init__(env)
+            self.last_done, self.last_obs = False, env.observation_space.sample()
+
+        def step(self, action):
+            if self.last_done:
+                return self.last_obs, 0, True, True, {}
+            obs, reward, terminated, truncated, info = self.env.step(action)
+            self.last_done = terminated or truncated
+            self.last_obs = obs
+            return obs, reward, terminated, truncated, info
+
+        def reset(self, **kwargs) -> Tuple[ObsType, dict]:
+            self.last_done, self.last_obs = False, self.env.observation_space.sample()
+            return self.env.reset()
+
+    train_env = ZeroRewardOnDoneWrapper(train_env)
     obs_dim = train_env.observation_space.shape[0]
     action_dim = 1 if isinstance(train_env.action_space, gym.spaces.Discrete) else train_env.action_space.shape[0]
 
@@ -90,15 +105,17 @@ def ars_policy_train(
 
         def forward(self, state):
             x = state
-            x = train_normalizer.obs_norm(x)  # TODO(Look into using normalization of gym environment)
+            # TODO(
+            #  Bad place to place the normalization
+            #  Look into using normalization of gym environment)
+            x = train_normalizer.obs_norm(x)
             action = self.model(th.Tensor(x))
             return action
 
     ars_cartpole_opti = ARSOptimizer(parameters=param_vector, n_directions=n_directions, env=train_env, action_sz=4,
-                                     sdv=0.05, step_sz=0.02, policy=train_policy, normalizer=train_normalizer,
-                                     hrz=1_000)
+                                     sdv=0.05, step_sz=0.02, policy=train_policy, normalizer=train_normalizer, hrz=500)
 
-    goodness, prev_goodness = - np.inf, - np.inf
+    goodness, prev_goodness = - th.inf, - th.inf
     with tqdm(total=train_steps, postfix={"goodness": goodness}) as tqdm_:
         for t in range(1, train_steps + 1):
             ars_cartpole_opti.step()

@@ -14,20 +14,20 @@ env_train.reset()
 humanoid_normalizer = Normalizer(376)
 
 
-class ConstScaleLayer(th.nn.Module):
-    def __init__(self, constant: th.float):
-        super(ConstScaleLayer, self).__init__()
-        self.constant = constant
+class HumanoidPolicyModule(th.nn.Module):
+    def __init__(self):
+        super(HumanoidPolicyModule, self).__init__()
+        self.network = th.nn.Sequential(
+            th.nn.Linear(in_features=376, out_features=17, bias=True),
+            th.nn.Tanh(),
+        )
 
-    def forward(self, tensor: Tensor) -> Tensor:
-        return tensor * self.constant
+    def forward(self, x: Tensor):
+        x = 0.4 * self.network(x)
+        return x
 
 
-humanoid_policy = th.nn.Sequential(
-    th.nn.Linear(in_features=376, out_features=17, bias=True),
-    th.nn.Tanh(),
-    ConstScaleLayer(constant=0.4)
-)
+humanoid_policy = HumanoidPolicyModule()
 
 if __name__ == '__main__':
     # ars_policy_train(
