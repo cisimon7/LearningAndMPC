@@ -8,5 +8,5 @@ class LinearGaussianModule(th.nn.Module):
         self.mean = th.nn.Parameter(th.randn(n))
         self.variance = th.nn.Parameter(th.randn(n))
 
-    def forward(self, X: Tensor = None):
+    def forward(self, x: Tensor = None):
         return th.distributions.multivariate_normal.MultivariateNormal(self.mean, self.variance).sample()
