@@ -1,1 +1,1 @@
-from LinearGaussianPolicy import *
+from .LinearGaussianPolicy import *
