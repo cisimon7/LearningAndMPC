@@ -4,6 +4,7 @@ import gym
 import copy
 import math
 import torch as th
+import numpy as np
 import functorch as fth
 from torch import Tensor
 from copy import deepcopy
@@ -15,7 +16,7 @@ from gym.spaces import Discrete, MultiDiscrete
 
 
 class ARSOptimizer(Optimizer):
-    def __init__(self, env: gym.Env, policy: th.nn.Module, lr=1, sdv=1, n_directions=16,
+    def __init__(self, env: gym.Env, policy: th.nn.Module, lr=1E-2, sdv=1E-3, n_directions=16,
                  n_choice=None, hrz=1, normalizer=None, alive_bonus=0):
 
         # ars directional requirements
@@ -37,7 +38,7 @@ class ARSOptimizer(Optimizer):
         parameters = th.nn.utils.parameters_to_vector(policy.parameters()).detach().cpu()
         parameters.data.mul_(0)
         super().__init__([parameters], dict())
-        self.normalizer = normalizer if normalizer else Normalizer(action_sz)
+        self.normalizer = normalizer if normalizer else Normalizer(obs_sz)
 
         self.n_choice, self.duration, self.sdv = n_choice, hrz, sdv
         self.loss, self.env, self.policy = -th.inf, env, policy
@@ -45,14 +46,14 @@ class ARSOptimizer(Optimizer):
 
         # Things for parallelzing
         # TODO(replace with python multiprocessing)
-        self.vec_env = gym.vector.SyncVectorEnv([lambda: env for _ in range(n_directions)])
-        self.vec_models, self.vec_params, self.vec_buffers = fth.combine_state_for_ensemble(
-            [copy.deepcopy(policy) for _ in range(n_directions)]
-        )  # TODO(Model not changing on each step)
+        # self.vec_env = gym.vector.SyncVectorEnv([lambda: env for _ in range(n_directions)])
+        # self.vec_models, self.vec_params, self.vec_buffers = fth.combine_state_for_ensemble(
+        #     [copy.deepcopy(policy) for _ in range(n_directions)]
+        # )  # TODO(Model not changing on each step)
 
         self.shapes = []  # store shapes of different layers of model
-        for param in self.vec_params:
-            self.shapes.append(param.shape[1:])
+        for param in self.policy.parameters():
+            self.shapes.append(param.shape)
 
     # Reshape parameter vector into model parameterm structure
     def reshape_tensor(self, tensor: Tensor):
@@ -64,7 +65,7 @@ class ARSOptimizer(Optimizer):
 
         return parameters
 
-    def vec_query_oracle(self, parameters: Tensor) -> Tensor:
+    def vec_query_oracle(self, parameters) -> Tensor:
         def explore(params: Tensor) -> Tensor:
             # Loading parameters to model
             policy = deepcopy(self.policy)
@@ -102,8 +103,7 @@ class ARSOptimizer(Optimizer):
         # Line 4 of Algorithm: i.i.d standard normal distribution
         # Using a standard deviation of 0.5 so as most of generated vectors would be within a distance of
         # 1 from mean and the step size can be used to control it
-        deltas = th.normal(mean=0.0, std=self.sdv, size=(self.n_directions, *parameters.shape))
-        # print("delta\n", deltas)
+        deltas = th.normal(mean=0.0, std=1.0, size=(self.n_directions, *parameters.shape))
 
         # Line 5 of Algorithm (pytorch broadcasting)
         deltas_plus = th.add(parameters, (self.sdv * deltas))
@@ -128,17 +128,20 @@ class ARSOptimizer(Optimizer):
         rwd_minus_sorted = rwd_m[arg_rwd_max][:self.n_choice]
 
         # Line 7 of Algorithm
-        stack_rwds = th.hstack([rwd_p, rwd_m])
+        stack_rwds = th.hstack([rwd_plus_sorted, rwd_minus_sorted])
         sdv_rwd = th.std(stack_rwds)  # .clip(1e-6)
         grad = ((self.step_sz / (self.n_choice * sdv_rwd)) *
                 (rwd_plus_sorted - rwd_minus_sorted) @ deviations_sorted)
         parameters.data.add_(grad)
 
-        mean_rwd = th.max(stack_rwds)
+        mean_rwd = th.mean(stack_rwds)
         if mean_rwd > self.loss:
             self.loss = mean_rwd
 
         return None
 
     def load(self):
-        th.nn.utils.vector_to_parameters(self.param_groups[0]["params"][0], self.policy.parameters())
+        th.nn.utils.vector_to_parameters(
+            self.param_groups[0]["params"][0],
+            self.policy.parameters()
+        )

@@ -38,7 +38,7 @@ def ars_minimize(obj_func: Callable, n_vars, n_steps=1_000, on_step: Callable[[f
     optimizer = ARSOptimizer(
         env=MinimizationEnv(),
         policy=policy,
-        sdv=1,
+        sdv=1E-3,
         **ars_opti_kwargs
     )
 

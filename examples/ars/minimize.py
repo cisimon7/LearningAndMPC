@@ -14,7 +14,7 @@ def rosenbrock(xy):
 
 
 def quadratic_program(x: th.Tensor):
-    # opti_val = 0, opt_var = [1, 1, 1]
+    # opti_val = 0.75, opt_var = [-0.5, -0.5, -0.5]
     A = th.eye(3)
     b = th.ones(3)
     x = x.reshape(1, -1)
@@ -22,20 +22,20 @@ def quadratic_program(x: th.Tensor):
 
 
 if __name__ == '__main__':
+    th.manual_seed(73)  # 42, 73
+
     opt = ars_minimize(
         obj_func=rosenbrock,
         n_vars=2,
-        lr=1E-0,
         n_steps=1000,
     )
     print(f"Minimum at: {opt.numpy()}")
 
-    sleep(0.05)
+    sleep(0.01)
 
-    # opt = ars_minimize(
-    #     obj_func=quadratic_program,
-    #     n_vars=3,
-    #     lr=1,
-    #     n_steps=1000,
-    # )
-    # print(f"Minimum at: {opt.numpy()}")
+    opt = ars_minimize(
+        obj_func=quadratic_program,
+        n_vars=3,
+        n_steps=1_000,
+    )
+    print(f"Minimum at: {opt.numpy()}")

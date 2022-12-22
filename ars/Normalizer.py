@@ -28,6 +28,8 @@ class Normalizer:
                 (th.mul(self.mean, self.n) @ self.mean.transpose(0, -1)))
 
     def normalize(self, inputs: Tensor):
+        # print(inputs.dtype)
+        inputs = inputs.float()
         return (inputs - self.mean) @ th.diag(th.pow(1/th.diag(self.cov), -0.5))
 
     def obs_norm(self, inputs: Tensor):
